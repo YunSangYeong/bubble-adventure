@@ -51,6 +51,7 @@ window.addEventListener('keyup',e=>{if(keyboard.has(e.code))e.preventDefault();k
 function releasePointer(e) { touches.delete(e.pointerId);document.querySelectorAll('[data-action]').forEach(b=>b.classList.toggle('active',[...touches.values()].includes(b.dataset.action))); }
 for(const button of document.querySelectorAll('[data-action]')) {
  button.addEventListener('pointerdown',e=>{e.preventDefault();if(state!=='playing')return;button.setPointerCapture(e.pointerId);touches.set(e.pointerId,button.dataset.action);button.classList.add('active');if(button.dataset.action==='jump')jumpQueued=true;if(button.dataset.action==='fire')fireQueued=true;});
+ button.addEventListener('pointermove',e=>{if(!touches.has(e.pointerId))return;const r=button.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)releasePointer(e);});
  for(const name of ['pointerup','pointercancel','lostpointercapture','pointerleave'])button.addEventListener(name,releasePointer);
  button.addEventListener('contextmenu',e=>e.preventDefault());
 }
