@@ -90,10 +90,49 @@ function update(dt){
  for(const p of particles){p.life-=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=170*dt;}particles=particles.filter(p=>p.life>0);
  if(state==='playing'&&enemies.length===0){transition+=dt;if(transition>=1){score+=250;saveBest();sound('win');if(level===4){state='won';clearInput();hud();$('pause').disabled=true;overlay('동굴의 새로운 영웅!',`다섯 동굴을 모두 구했어요! 최종 점수 ${score.toLocaleString('ko-KR')}점`,'한 번 더 모험하기','ADVENTURE COMPLETE');}else{level++;loadStage();}}}
 }
-// Original pixel sprites: a mint cave explorer, coral pebble critters and lilac hoppers.
-const hero=['  MMMM  ',' MMMMMM ','MMMLLMMM','MMMLLMMM',' MMMMMM ',' WWMMWW ',' WDKKDW ',' WWWWWW ','  TTTT  ',' TT  TT '];
-const critter=['  CCCC  ',' CCCCCC ','CCWCCWCC','CCKCCKCC','CCCCCCCC',' CCCCCCC','  CCCC  ',' CC  CC '];
-function sprite(pattern,x,y,scale,colors,flip=false){ctx.save();ctx.translate(Math.round(x),Math.round(y));if(flip){ctx.translate(pattern[0].length*scale,0);ctx.scale(-1,1);}pattern.forEach((row,iy)=>[...row].forEach((c,ix)=>{if(colors[c]){ctx.fillStyle=colors[c];ctx.fillRect(ix*scale,iy*scale,scale,scale);}}));ctx.restore();}
+// Original cave-sprite designs: a sprout-tufted explorer and round pebble sprites.
+// Two-pixel details keep eyes, cheeks and the cream tummy readable on small screens.
+const heroHead = [
+ '     OO         ',
+ '    OLL OOO     ',
+ '    OLMOLLO     ',
+ '   OMMMMMMMO    ',
+ '  OMLMMMMMMMO   ',
+ ' OMLLMMWWMWWMO  ',
+ ' OMLMMMWWMWWMO  ',
+ ' OMMMMMWKMWKMO  ',
+ ' OMMPPMMMMMMMO  ',
+ '  OMMMMMKMMMO   ',
+ ' OMMMWWWWWMMMO  ',
+ ' OMMWWWWWWWMMO  ',
+ '  OSWWWWWWWSSO  ',
+ '   OSSWWWSSO    '
+].map(row=>row.padEnd(16,' '));
+const heroFeet = [
+ ['   OTT  TTTO    ','    OO  OOO     '],
+ ['  OTTT   TTO    ','   OOO   OO     '],
+ ['   OTTTTTTO     ','    OOOOOO      ']
+];
+const critter = [
+ '    OOOOO    ',
+ '  OOCCCCCOO  ',
+ ' OCLLCCCCCCO ',
+ ' OCLCCWWCWWO ',
+ 'OCCCCCWKCWKCO',
+ 'OCCPPCCCCCCCO',
+ 'OCCCCCCKCCCCO',
+ ' OCCTTTTTCCO ',
+ ' OCCCTTTCCCO ',
+ '  OCCCCCCCO  ',
+ '   OOCCOOO   ',
+ '  OTT  TTO   ',
+ '   OO  OO    '
+];
+function drawHero(target,x,y,scale=2,dir=1,pose=0) {
+ const colors={O:'#183c45',M:'#79dfbc',L:'#c4ffcf',S:'#45af9a',W:'#fff2cc',K:'#243443',P:'#ffa5b0',T:'#f8c77e'};
+ sprite([...heroHead,...heroFeet[pose]],x,y,scale,colors,dir<0,target);
+}
+function sprite(pattern,x,y,scale,colors,flip=false,target=ctx){target.save();target.translate(Math.round(x),Math.round(y));if(flip){target.translate(pattern[0].length*scale,0);target.scale(-1,1);}pattern.forEach((row,iy)=>[...row].forEach((c,ix)=>{if(colors[c]){target.fillStyle=colors[c];target.fillRect(ix*scale,iy*scale,scale,scale);}}));target.restore();}
 function draw(){
  const [bg,rock,moss]=palettes[level];ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
  ctx.fillStyle=rock;for(let i=0;i<18;i++){const x=i*49;ctx.fillRect(x,0,22,14+(i*19)%65);ctx.fillRect(x+13,H-20-(i*11)%35,28,60);}ctx.globalAlpha=.25;for(let i=0;i<45;i++){ctx.fillStyle=i%3?'#a5d7c0':'#ffda96';ctx.fillRect((i*157+31)%W,(i*83+56)%390,2,2);}ctx.globalAlpha=1;
@@ -101,14 +140,25 @@ function draw(){
  ctx.strokeStyle=rock;ctx.lineWidth=15;ctx.beginPath();ctx.arc(400,430,220,Math.PI,0);ctx.stroke();
  for(const p of platforms){ctx.fillStyle='#112937';ctx.fillRect(p.x,p.y+5,p.w,p.h);ctx.fillStyle=rock;ctx.fillRect(p.x,p.y,p.w,p.h);ctx.fillStyle=moss;ctx.fillRect(p.x,p.y,p.w,5);ctx.fillStyle='#ffffff25';for(let x=p.x+8;x<p.x+p.w-5;x+=24)ctx.fillRect(x,p.y+8,7,3);}
  for(let i=0;i<7;i++){const x=40+i*119;ctx.fillStyle=i%2?'#bc9ed0':'#f8bf8b';ctx.fillRect(x,FLOOR-10,5,10);ctx.fillRect(x-4,FLOOR-13,13,5);}
- for(const e of enemies){const c=e.kind==='hopper'?'#c6a2ed':'#f19583';sprite(critter,e.x+1,e.y+2,3,{C:c,W:'#fff2db',K:'#253645'},e.dir<0);if(e.kind==='hopper'){ctx.fillStyle=c;ctx.fillRect(e.x+5,e.y-4,4,8);ctx.fillRect(e.x+17,e.y-4,4,8);}}
+ for(const e of enemies){
+ const hopper=e.kind==='hopper',bounce=!e.trapped&&e.grounded&&Math.abs(e.vx)>0?Math.sin(elapsed*12)*1:0;
+ const colors={O:'#34354c',C:hopper?'#c3aff5':'#ffa692',L:hopper?'#eee0ff':'#ffe3b0',W:'#fff9e9',K:'#34354c',P:'#ef829e',T:hopper?'#a38add':'#e77f83'};
+ if(hopper){ctx.fillStyle=colors.O;ctx.fillRect(e.x+5,e.y-5,5,8);ctx.fillRect(e.x+17,e.y-5,5,8);ctx.fillStyle=colors.L;ctx.fillRect(e.x+6,e.y-4,2,6);ctx.fillRect(e.x+18,e.y-4,2,6);}
+ sprite(critter,e.x,e.y+bounce,2,colors,e.dir<0);
+ }
  for(const b of bubbles){ctx.save();ctx.strokeStyle=b.enemy?(b.trapTime>4.5?'#ffcd82':'#d6faff'):'#89d7ed';ctx.lineWidth=b.enemy?3:2;ctx.fillStyle=b.enemy?'#a4e4ff35':'#a4e4ff18';ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.fillStyle='#efffff';ctx.fillRect(b.x-b.r*.45,b.y-b.r*.55,4,4);if(b.enemy){ctx.strokeStyle='#ffe0a6';ctx.lineWidth=2;ctx.beginPath();ctx.arc(b.x,b.y,b.r+4,-Math.PI/2,-Math.PI/2+Math.PI*2*(1-b.trapTime/6));ctx.stroke();}ctx.restore();}
- if(player && (player.invulnerable<=0||Math.floor(elapsed*12)%2===0))sprite(hero,player.x+1,player.y,3,{M:'#75dbbb',L:'#d5ffe0',W:'#f5dfb3',D:'#263b4a',K:'#263b4a',T:'#efb66d'},player.dir<0);
+ if(player && (player.invulnerable<=0||Math.floor(elapsed*12)%2===0)){
+ const walking=player.grounded&&Math.abs(player.vx)>0;
+ const pose=!player.grounded?2:walking?Math.floor(elapsed*10)%2:0;
+ drawHero(ctx,player.x-3,player.y-2-(walking?pose:0),2,player.dir,pose);
+ }
  for(const p of particles){ctx.globalAlpha=Math.max(0,p.life*2);ctx.fillStyle=p.color;ctx.fillRect(p.x,p.y,4,4);}ctx.globalAlpha=1;
  ctx.fillStyle='#bddbd9';ctx.font='12px sans-serif';ctx.fillText(['이끼빛 입구','반짝 버섯길','옥빛 계단','노을의 동굴','별빛 왕관'][level],18,26);
  if(transition>0){ctx.fillStyle='#fff0bf';ctx.font='bold 28px sans-serif';ctx.textAlign='center';ctx.fillText('동굴을 구했어요!',W/2,140);ctx.textAlign='left';}
 }
 let last=0,accumulator=0;
 function frame(now){if(!last)last=now;const dt=Math.min((now-last)/1000,.1);last=now;if(state==='playing'){accumulator+=dt;while(accumulator>=STEP){if(state==='playing')update(STEP);accumulator-=STEP;}}else accumulator=0;draw();requestAnimationFrame(frame);}
+const portrait=document.getElementById('hero-portrait');
+if(portrait)drawHero(portrait.getContext('2d'),12,0,5);
 loadStage();requestAnimationFrame(frame);
 })();
